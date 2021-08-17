@@ -35,11 +35,13 @@ class AddPost(BaseModel):
     post_title: str
     post_slug: str
     content: str
+    user_id: int
 
 
 class UpdatePost(BaseModel):
     post_title: Optional[str] = ''
     post_slug: Optional[str] = ''
+    published: Optional[bool] = False
     content: Optional[str] = ''
 
 
@@ -66,3 +68,17 @@ class RegisterUser(BaseModel):
         if value <= 16:
             raise ValueError("Вам должно быть больше 16 лет")
         return value
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+
+class ShowUser(BaseModel):
+    username: str
+    email: Optional[str] = None

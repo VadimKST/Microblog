@@ -1,5 +1,5 @@
-from sqlalchemy import MetaData, Table, Column, Integer, String, Text, Boolean, DateTime, ForeignKey, CheckConstraint
-from datetime import datetime
+from sqlalchemy import (MetaData, Table, Column, Integer, String, Text, Boolean,
+                        DateTime, ForeignKey, CheckConstraint, sql)
 
 metadata = MetaData()
 
@@ -26,9 +26,8 @@ post = Table('post', metadata,
              Column('post_title', String(200), nullable=False),
              Column('post_slug', String(200), nullable=False),
              Column('content', Text(), nullable=False),
-             Column('published', Boolean(), default=False),
-             Column('created_on', DateTime(), default=datetime.now),
-             Column('updated_on', DateTime(), default=datetime.now, onupdate=datetime.now),
+             Column('published', Boolean(), default=sql.expression.false()),
+             Column('created_on', DateTime(), server_default=sql.func.now()),
+             Column('updated_on', DateTime(), server_default=sql.func.now(), onupdate=sql.func.now()),
              Column('user_id', ForeignKey("user.id"))
              )
-

@@ -1,10 +1,9 @@
 import os
 
+import databases
 from sqlalchemy import create_engine
 
-SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI')
+DATABASE_URL = os.environ.get('DATABASE_URI')
 
-engine = create_engine(SQLALCHEMY_DATABASE_URI)
-connection = engine.connect()
-
-print(engine)
+database = databases.Database(DATABASE_URL)
+engine = create_engine(DATABASE_URL)
