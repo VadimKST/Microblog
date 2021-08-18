@@ -1,22 +1,22 @@
 from typing import List
 
-from fastapi import HTTPException, APIRouter
+from fastapi import HTTPException, APIRouter, Depends
 
 from db import database
 from core.models.model import post
-from core.schemas.schemes import AddPost, UpdatePost, ShowPost
-
+from core.schemas.schemes import AddPost, UpdatePost, ShowPost, ShowUser
+from app import dependencies
 
 router = APIRouter(prefix="/post")
 
 
 @router.post("/create", status_code=201)
-async def create_post(data_post: AddPost):
+async def create_post(data_post: AddPost, current_user: dict = Depends(dependencies.get_current_user)):
     query = post.insert().values(
         post_title=data_post.post_title,
         post_slug=data_post.post_slug,
         content=data_post.content,
-        user_id=data_post.user_id
+        user_id=current_user["id"]
     )
     print(query)
     await database.execute(query)
@@ -24,9 +24,14 @@ async def create_post(data_post: AddPost):
 
 
 @router.put("/update/{post_id}")
-async def update_post(post_id: int, data_post: UpdatePost):
-    update_query = post.update().values(**data_post.dict(exclude_unset=True)).where(post.c.id == post_id)
-    if await database.fetch_one(post.select().where(post.c.id == post_id)):
+async def update_post(
+        post_id: int,
+        new_data_post: UpdatePost,
+        current_user: dict = Depends(dependencies.get_current_user)
+):
+    update_query = post.update().values(**new_data_post.dict(exclude_unset=True)).where(post.c.id == post_id)
+    data_post = await database.fetch_one(post.select().where(post.c.id == post_id))
+    if data_post and dict(data_post.items())["user_id"] == current_user["id"]:
         return await database.execute(update_query)
     else:
         raise HTTPException(status_code=404, detail="Такого поста не существует")

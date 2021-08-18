@@ -1,22 +1,15 @@
-import os
 from datetime import timedelta, datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Form, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import jwt, JWTError
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from sqlalchemy import select
 
 from core.models.model import user, user_details, post
-from core.schemas.schemes import RegisterUser, ShowPost, Token, TokenData, ShowUser
+from core.schemas.schemes import RegisterUser, ShowPost, Token, ShowUser
 from db import database
-
-SECRET_KEY = os.environ.get('SECRET_KEY')
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/token")
+from app import dependencies
 
 router = APIRouter(prefix="/user")
 
@@ -31,74 +24,33 @@ def verify_password(password: str, hashed_password: str):
     return pwd_context.verify(password, hashed_password)
 
 
-def authenticate_user(db_model, username: str, password: str):
-    user_dict = database.execute(db_model.select().where(db_model.c.username == username)).first()
+async def authenticate_user(db_model, username: str, password: str):
+    user_dict = await database.fetch_one(db_model.select().where(db_model.c.username == username))
     if not user_dict:
         return None
-    if not verify_password(password, user_dict.password):
+    if not verify_password(password, dict(user_dict.items())["password"]):
         return None
     return user_dict
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
-        print(payload)
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    user_data = database.execute(user.select().where(user.c.username == token_data.username)).first()
-    if user_data is None:
-        raise credentials_exception
-    return user_data
-
-
-@router.post("/login")
-def login_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user_data = authenticate_user(db_model=user, username=form_data.username, password=form_data.password)
-    if not user_data:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-
-    return {"access_token": user_data.username, "token_type": "bearer"}
-
-
-@router.post("/token", response_model=Token)
+@router.post("/login", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user_data = authenticate_user(db_model=user, username=form_data.username, password=form_data.password)
+    user_data = await authenticate_user(db_model=user, username=form_data.username, password=form_data.password)
     if not user_data:
         raise HTTPException(
             status_code=401,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user_data.username}, expires_delta=access_token_expires
+    access_token_expires = timedelta(minutes=dependencies.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = dependencies.create_access_token(
+        data={"sub": dict(user_data.items())["username"]}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.get("/me", response_model=ShowUser)
-def read_users_me(current_user: ShowUser = Depends(get_current_user)):
+def read_users_me(current_user: ShowUser = Depends(dependencies.get_current_user)):
     return current_user
 
 

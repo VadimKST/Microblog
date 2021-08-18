@@ -35,7 +35,6 @@ class AddPost(BaseModel):
     post_title: str
     post_slug: str
     content: str
-    user_id: int
 
 
 class UpdatePost(BaseModel):
@@ -80,5 +79,6 @@ class TokenData(BaseModel):
 
 
 class ShowUser(BaseModel):
+    id: int
     username: str
     email: Optional[str] = None
